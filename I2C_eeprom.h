@@ -24,6 +24,8 @@
 #define I2C_DEVICESIZE_24LC02         256
 #define I2C_DEVICESIZE_24LC01         128
 
+#define EN_AUTO_WRITE_PROTECT           1
+#define PER_BYTE_COMPARE                1
 
 //  AT24C32 has a WriteCycle Time of max 20 ms
 //  so one need to set I2C_WRITEDELAY to 20000.
@@ -100,8 +102,11 @@ public:
   //  updates a block in memory, writes only if there is a new value.
   //  only to be used when you expect to write same buffer multiple times.
   //  test your performance gains!
-  //  returns bytes written.
+  //  If set to PerByteCompare (default), returns number of bytes written.
+  //  Else, return cumulative number of bytes written based on
+  //  each I2C_BUFFERSIZE chunk updated and any potential remainder
   uint16_t updateBlock(const uint16_t memoryAddress, const uint8_t * buffer, const uint16_t length);
+  void setPerByteCompre(bool b)
 
 
   //  same functions as above but with verify
@@ -177,6 +182,7 @@ private:
 
   int8_t   _writeProtectPin = -1;
   bool     _autoWriteProtect = false;
+  bool     _perByteCompare = true; 
 
   UNIT_TEST_FRIEND;
 };
