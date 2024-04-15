@@ -106,7 +106,7 @@ public:
   //  Else, return cumulative number of bytes written based on
   //  each I2C_BUFFERSIZE chunk updated and any potential remainder
   uint16_t updateBlock(const uint16_t memoryAddress, const uint8_t * buffer, const uint16_t length);
-  void setPerByteCompare(bool b)
+  void setPerByteCompare(bool b);
 
 
   //  same functions as above but with verify
