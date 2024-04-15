@@ -60,6 +60,7 @@ bool I2C_eeprom::begin(int8_t writeProtectPin)
   _writeProtectPin = writeProtectPin;
   if (_writeProtectPin >= 0)
   {
+    _autoWriteProtect = EN_AUTO_WRITE_PROTECT;
     pinMode(_writeProtectPin, OUTPUT);
     preventWrite();
   }
@@ -187,22 +188,73 @@ uint16_t I2C_eeprom::updateBlock(const uint16_t memoryAddress, const uint8_t * b
   uint16_t addr = memoryAddress;
   uint16_t len = length;
   uint16_t rv = 0;
-  while (len > 0)
-  {
-    uint8_t buf[I2C_BUFFERSIZE];
-    uint8_t cnt = I2C_BUFFERSIZE;
+  
+  if (_perByteCompare) {
+    // Serial.println("Performing BYTE SIZE updates");
+    uint16_t writeCnt = 0;
 
-    if (cnt > len) cnt = len;
-    rv     += _ReadBlock(addr, buf, cnt);
-    if (memcmp(buffer, buf, cnt) != 0)
-    {
-      _pageBlock(addr, buffer, cnt, true);
+    // Read the original data block from the EEPROM.
+    uint8_t origBuf[length];
+    _ReadBlock(addr, origBuf, length, IDPage);
+
+    // Temporary buffer to hold changes.
+    uint8_t writeBuf[length];
+    memset(writeBuf, 0, length); // Clear the write buffer.
+    
+    uint16_t diffCount = 0;
+    uint16_t startDiffAddr = 0;
+
+    // Iterate over each byte to find differences.
+    for (uint16_t i = 0; i < len; ++i) {
+      if (buffer[i] != origBuf[i]) {
+        // Start buffering when the first difference is found.
+        if (diffCount == 0) {
+          startDiffAddr = addr + i; // Save the starting address of the difference.
+        }
+        writeBuf[diffCount++] = buffer[i]; // Add differing byte to buffer.
+      } else {
+        // If there was a difference and now it stops, write the buffered changes.
+        if (diffCount > 0) {
+          rv += diffCount;
+          _pageBlock(startDiffAddr, writeBuf, diffCount, IDPage);
+          diffCount = 0; // Reset difference count after writing.
+          writeCnt++;
+        }
+      }
     }
-    addr   += cnt;
-    buffer += cnt;
-    len    -= cnt;
+
+    // Check if there are any remaining differences to write after the loop.
+    if (diffCount > 0) {
+      rv += diffCount;
+      _pageBlock(startDiffAddr, writeBuf, diffCount, IDPage);
+      writeCnt++;
+    }
+    // Serial.print("EEPROM Write cycles: ");
+    // Serial.println(writeCnt);
+
+    return rv;
+  } 
+  else 
+  {
+    // Serial.println("Performing BUFFERSIZE updates");
+    while (len > 0)
+    {
+      uint8_t buf[I2C_BUFFERSIZE];
+      uint8_t cnt = I2C_BUFFERSIZE;
+
+      if (cnt > len) cnt = len;
+      _ReadBlock(addr, buf, cnt);
+      if (memcmp(buffer, buf, cnt) != 0)
+      {
+        rv   += cnt; // update rv to actual number of bytes written due to failed compare
+        _pageBlock(addr, buffer, cnt, true);
+      }
+      addr   += cnt;
+      buffer += cnt;
+      len    -= cnt;
+    }
+    return rv;    
   }
-  return rv;
 }
 
 
@@ -531,6 +583,11 @@ bool I2C_eeprom::getAutoWriteProtect()
   return _autoWriteProtect;
 }
 
+
+void I2C_eeprom::setPerByteCompare(bool b)
+{
+  _perByteCompare = b;
+}  
 
 ////////////////////////////////////////////////////////////////////
 //
