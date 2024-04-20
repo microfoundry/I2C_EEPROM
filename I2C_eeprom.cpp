@@ -191,15 +191,11 @@ uint16_t I2C_eeprom::updateBlock(const uint16_t memoryAddress, const uint8_t * b
   
   if (_perByteCompare) {
     // Serial.println("Performing BYTE SIZE updates");
-    uint16_t writeCnt = 0;
+    // uint16_t writeCnt = 0;
 
     // Read the original data block from the EEPROM.
     uint8_t origBuf[length];
     _ReadBlock(addr, origBuf, length);
-
-    // Temporary buffer to hold changes.
-    uint8_t writeBuf[length];
-    memset(writeBuf, 0, length); // Clear the write buffer.
     
     uint16_t diffCount = 0;
     uint16_t startDiffAddr = 0;
@@ -211,23 +207,16 @@ uint16_t I2C_eeprom::updateBlock(const uint16_t memoryAddress, const uint8_t * b
         if (diffCount == 0) {
           startDiffAddr = addr + i; // Save the starting address of the difference.
         }
-        writeBuf[diffCount++] = buffer[i]; // Add differing byte to buffer.
-      } else {
-        // If there was a difference and now it stops, write the buffered changes.
-        if (diffCount > 0) {
-          rv += diffCount;
-          _pageBlock(startDiffAddr, writeBuf, diffCount, true);
-          diffCount = 0; // Reset difference count after writing.
-          writeCnt++;
-        }
+        diffCount++; // Add differing byte to buffer.
+        if (i < len - 1) continue;  //  <<<<<<<<<<<<<<  falls through when i == len -1.
+      } 
+      // If there was a difference and now it stops, write the buffered changes.
+      if (diffCount > 0) {
+        rv += diffCount;
+        _pageBlock(startDiffAddr, &buffer[startDiffAddr], diffCount, true);
+        diffCount = 0; // Reset difference count after writing.
+        // writeCnt++;
       }
-    }
-
-    // Check if there are any remaining differences to write after the loop.
-    if (diffCount > 0) {
-      rv += diffCount;
-      _pageBlock(startDiffAddr, writeBuf, diffCount, true);
-      writeCnt++;
     }
     // Serial.print("EEPROM Write cycles: ");
     // Serial.println(writeCnt);
